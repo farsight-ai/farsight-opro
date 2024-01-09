@@ -26,7 +26,7 @@ pip install farsight-opro
 
 Dive into the world of optimized prompt engineering with Farsight's OPRO SDK, an implementation inspired by the innovative [OPRO paper](https://arxiv.org/abs/2309.03409). Whether you're working on a small project or a large-scale application, our SDK adapts to your needs.
 
-Begin optimizing promptly with this simple setup. For comprehensive guidance, visit our [detailed documentation](https://api.farsight-ai.com/farsight-opro/).
+Begin optimizing promptly with this simple setup. For comprehensive guidance, visit our detailed [documentation](https://api.farsight-ai.com/farsight-opro/).
 
 ```bash
 from opro import FarsightOPRO
