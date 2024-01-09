@@ -75,7 +75,7 @@ prompts_and_scores = farsight.train(train_set, examples, test_set)
 
 #### Bug Reports & Feature Requests
 
-Encounter an issue or have an idea? Share your feedback on our [issue tracker](https://github.com/farsight-xyz/llmfeedback/issues).
+Encounter an issue or have an idea? Share your feedback on our [issue tracker]([https://github.com/farsight-ai/farsight-opro/issues]).
 
 #### Development Contributions
 
