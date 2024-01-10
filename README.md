@@ -1,6 +1,6 @@
 
 ## Revolutionize your prompt engineering with Farsight's OPRO SDK  
-Stop wasting time with prompt engineering, tailored to your unique inputs and targets, our system effortlessly identifies the optimal system prompt for you.
+Stop wasting time with prompt engineering, tailored to your unique inputs and targets, our sdk effortlessly identifies the optimal system prompt for you.
  
 <img src="opro/src/images/readme_cartoon.png" alt="cartoon" width="500"/>
 
