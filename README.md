@@ -1,5 +1,5 @@
 
-## Revolutionize your prompt engineering with Farsight's OPRO SDK 
+## Revolutionize your prompt engineering with Farsight's OPRO SDK  <img src="opro/src/images/roundedGradient.png" alt="logo" width="20"/>
 Stop wasting time prompt engineering, tailored to your unique inputs and targets, our system effortlessly identifies the optimal system prompt for you.
 
 <img src="opro/src/images/readme_cartoon.png" alt="cartoon" width="500"/>
