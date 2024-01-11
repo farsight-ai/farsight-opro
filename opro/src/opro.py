@@ -1,16 +1,16 @@
 import json
-import matplotlib.pyplot as plt
 import pandas as pd
 import random
-import time
 from openai import OpenAI, AzureOpenAI
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 
 class FarsightOPRO:
-    def __init__(self, openai_key: str, azure_endpoint=None, api_version=None):
+    def __init__(
+        self, openai_key: str, azure_endpoint=None, api_version=None, model=None
+    ):
         self.key = openai_key
+        self.model = model if model else "gpt-3.5-turbo"
         if azure_endpoint and api_version:
             self.client = AzureOpenAI(
                 api_key=openai_key,
@@ -18,7 +18,7 @@ class FarsightOPRO:
                 api_version=api_version,
             )
         else:
-            self.client = OpenAI(openai_key)
+            self.client = OpenAI(api_key=openai_key)
 
     """
     Evaluates the accuracy of a response based on the given output and target pair. 
@@ -29,6 +29,7 @@ class FarsightOPRO:
     returns: 
         - score: int, 0 being incorrect and 1 being correct
     """
+
     def llm_evaluator(self, input: str, output: str, target: str):
         prompt = f"""
             You are an LLM evaluator, given this input "{input}" and this target output "{target}", is this output "{output}" correct?  
@@ -36,7 +37,7 @@ class FarsightOPRO:
         """
 
         chatCompletion = self.client.chat.completions.create(
-            model="gpt-35-turbo",
+            model=self.model,
             messages=[
                 {"role": "user", "content": prompt},
             ],
@@ -44,14 +45,9 @@ class FarsightOPRO:
         )
         # update token counts and get output
         content = chatCompletion.choices[0].message.content
-        print("target: ", target)
-        print("output: ", output)
-        print("evaluation: ", content)
         if "yes" in content or "Yes" in content:
-            print("score: ", 1)
             return 1
         else:
-            print("score: ", 0)
             return 0
 
     def generate_prompt(self, previous_prompts_and_scores, dataset):
@@ -65,11 +61,6 @@ class FarsightOPRO:
         best_prompts_avg = 0
         for pair in previous_prompts_and_scores:
             best_prompts_avg += pair["score"]
-
-        print(
-            "Average score accross 20 best prompts:",
-            best_prompts_avg / len(previous_prompts_and_scores),
-        )
 
         previous_instructions_str = ""
         for pair in previous_prompts_and_scores:
@@ -116,10 +107,11 @@ class FarsightOPRO:
         - score: float, average score between 0-1
     """
 
-    def get_average_score(self, system_prompt, dataset, eval_function):
+    def get_average_score(self, system_prompt, dataset, eval_function, sample_evals):
         score = 0
         global completion_tokens
         global prompt_tokens
+        samples = []
         for i in tqdm(range(len(dataset)), desc=" evaluation progress", leave=False):
             test_input = dataset[i]["input"]
             target = dataset[i]["target"]
@@ -127,7 +119,7 @@ class FarsightOPRO:
             {system_prompt}
             {test_input}"""
             chatCompletion = self.client.chat.completions.create(
-                model="gpt-35-turbo",
+                model=self.model,
                 messages=[
                     {"role": "user", "content": input},
                 ],
@@ -135,30 +127,53 @@ class FarsightOPRO:
             )
             output = chatCompletion.choices[0].message.content
             if eval_function:
-                score += eval_function(input, output, target)
+                sample_score = eval_function(input, output, target)
             elif target in output:
-                score += 1
+                sample_score = 1
+            score += sample_score
+            if sample_evals:
+                samples.append(
+                    {
+                        "sample": test_input,
+                        "target": target,
+                        "output": output,
+                        "score": sample_score,
+                    }
+                )
         score = score / len(dataset)
-        return score
+        return score, samples
 
     """
     Using the OPRO methodology with a fraction of the iteration cycles, generates the top 20 best prompts iteratively for the given dataset.
 
     params: 
-        - dataset: list of tuples in the format (input, expected_output)
-        - examples: list of 3 tuples in the format (input, expected_output) to be used as the examples in the prompt
-        - eval_function: function that takes in (input, output, and expected_output) and returns a score from 0-1, 0 being the worst possible score 
-            and 1 being the best possible score
+        - dataset: list[dict] required: This should include pairs of "input" (the query or request) and "target" (the desired output). We recommend at least 50 samples for robust results.
+        - test_dataset: similar to dataset, used for testing the efficacy of the generated prompts.
+        - num_iterations: The total number of iterations for prompt optimization. Default is 40.
+        - num_prompts_per_iteration: The number of different prompts generated per iteration. Default is 8.
+        - sample_evaluations: If True, includes results of each sample evaluated in results. Default is False
+        - eval_function: A custom scoring function that evaluates (input, output, expected_output) and returns a score between 0 and 1, with 1 being the best.
+    output: 
+        This includes up to 20 top system prompts, depending on your iteration settings. Each entry contains:
+        - "prompt": always included, The generated system prompt.
+        - "overall_score": always included,The average performance score across the dataset.
+        - "test_score":  included if a test dataset is provided. Reflects the prompt's efficacy on the test set.
+        - "sample_evals": included if sample evaluations is set to True. Contains evaluation results in the format list[dict], with the "sample" and the corresponding "score". 
     """
 
-    def train(
+    def generate_optimized_prompts(
         self,
         dataset,
-        examples,
+        test_set=None,
         num_iterations=40,
         prompts_generated_per_iteration=8,
+        sample_evaluations=False,
         eval_function=None,
     ):
+        if len(dataset) < 3:
+            raise ValueError(
+                "The dataset must have at least 3 elements. We recommend 50 elements."
+            )
         scorer = eval_function if eval_function else self.llm_evaluator
 
         # initialize price tracking variables
@@ -169,39 +184,41 @@ class FarsightOPRO:
         first_step_prompt = "Let’s solve the problem"
 
         # generate score for starting prompt and add to dictionary
-        first_step_score = self.get_average_score(first_step_prompt, dataset, scorer)
-        previous_prompts_and_scores = [
-            {"prompt": first_step_prompt, "score": first_step_score}
-        ]
+        first_step_score, samples = self.get_average_score(
+            first_step_prompt, dataset, scorer, sample_evaluations
+        )
+        if sample_evaluations:
+            previous_prompts_and_scores = [
+                {
+                    "prompt": first_step_prompt,
+                    "score": first_step_score,
+                    "sample_evals": samples,
+                }
+            ]
 
-        # initialize variables
-        x = []
-        y = []
-        start_time = time.time()
+        else:
+            previous_prompts_and_scores = [
+                {"prompt": first_step_prompt, "score": first_step_score}
+            ]
 
         # start prompt optimization iterations
         for i in range(num_iterations):
-            print(
-                "------------------------------------------------------------------------------------"
-            )
-            print("Iteration: ", i)
-
+            examples = random.sample(dataset, 3)
             prompt, previous_prompts_and_scores = self.generate_prompt(
                 previous_prompts_and_scores, examples
             )
             avg_score = 0
-            print(prompt)
 
             # generate multiple system prompts each iteration
             for j in range(prompts_generated_per_iteration):
                 chatCompletion = self.client.chat.completions.create(
-                    model="gpt-35-turbo",
+                    model=self.model,
                     messages=[
                         {"role": "user", "content": prompt},
                     ],
                     temperature=1.0,
                 )
-                # update token counts and get output
+                # update token counts and gets output
                 output = chatCompletion.choices[0].message.content
                 completion_tokens += chatCompletion.usage.completion_tokens
                 prompt_tokens += chatCompletion.usage.prompt_tokens
@@ -210,36 +227,41 @@ class FarsightOPRO:
                 generated_system_prompt = generated_system_prompt.replace("</INS>", "")
 
                 # get score and update variables
-                score = self.get_average_score(generated_system_prompt, dataset, scorer)
-                previous_prompts_and_scores.append(
-                    {"prompt": generated_system_prompt, "score": score}
+                score, samples = self.get_average_score(
+                    generated_system_prompt, dataset, scorer, sample_evaluations
                 )
+                results = {"prompt": generated_system_prompt, "score": score}
+
+                if sample_evaluations:
+                    results["sample_evals"] = samples
+
+                previous_prompts_and_scores.append(results)
                 avg_score += score
+        if test_set:
+            avg_test_score = 0
 
-                # update plot
-                x.append(i)
-                y.append(score)
+            for pair in previous_prompts_and_scores:
+                prompt = pair["prompt"]
 
-            # plot accuracy graph
-            plt.scatter(x, y)
-            plt.title("Prompt Optimization Accuracy")
-            plt.xlabel("Iterations")
-            plt.ylabel("Percent Accurate")
-            # plt.show()
+                (
+                    test_score,
+                    test_samples,
+                ) = self.get_average_score(prompt, test_set, scorer, sample_evaluations)
+                avg_test_score += test_score
+                pair["test_score"] = test_score
+                pair["sample_evals"] = test_samples
 
-            print("Average score across 8 generated prompts:", avg_score / 8)
+            # Get the top 20 best prompts
+            sorted_list = sorted(
+                previous_prompts_and_scores, key=lambda x: x["test_score"], reverse=True
+            )
+            previous_prompts_and_scores = sorted_list[:20]
 
-        # Calculate Cost
-        input_cost = prompt_tokens / 1000 * 0.001
-        output_cost = completion_tokens / 1000 * 0.002
-        total_cost = input_cost + output_cost
-        # plt.show()
-
-        print(
-            "------------------------------------------------------------------------------------"
-        )
-        print("Total Training Time: --- %s seconds ---" % (time.time() - start_time))
-        print("Total Cost: $", total_cost)
-        for pair in previous_prompts_and_scores:
-            print("Score: ", pair["score"], "Prompt: ", pair["prompt"])
+        else:
+            # Get the top 20 best prompts
+            sorted_list = sorted(
+                previous_prompts_and_scores, key=lambda x: x["score"], reverse=True
+            )
+            previous_prompts_and_scores = sorted_list[:20]
         return previous_prompts_and_scores
+

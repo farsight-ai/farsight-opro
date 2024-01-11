@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="farsight-opro",  # This is the name of the package
-    version="0.2.11",  # The initial release version
+    version="0.2.12",  # The initial release version
     author="Katie Pelton",  # Full name of the author
     description="Farsight LLM optimizer",
     long_description=long_description,  # Long description read from the the readme file

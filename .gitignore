@@ -1,0 +1,6 @@
+env/
+dist/
+build/
+examples/.env
+opro/src/__pycache__
+opro/src/farsight_opro.egg-info
