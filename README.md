@@ -32,41 +32,45 @@ Begin optimizing promptly with this simple setup. For comprehensive guidance, vi
 from opro import FarsightOPRO
 
 # Define your datasets
-train_set, examples, test_set = # ...
+dataset = # ...
 
 # Initialize with your OpenAI key
 farsight = FarsightOPRO(openai_key=OPEN_AI_KEY)
 
 # Get optimized prompts
-prompts_and_scores = farsight.get_prompts(train_set, examples, test_set)
+prompts_and_scores = farsight.generate_optimized_prompts(dataset)
 ```
 
 ### Full Example:
 
 ```bash
-from opro import FarsightOPRO
 import json
 from sklearn.model_selection import train_test_split
+from opro import FarsightOPRO
 
-# Set your OpenAI credentials
-farsight = FarsightOPRO(openai_key="<openai_key>")
+# replace with your openAI credentials
+OPEN_AI_KEY = "<openai_key>"
 
-# Load your dataset
-dataset_path = "/opro/src/bbh/movie_recommendation.json"
+farsight = FarsightOPRO(openai_key=OPEN_AI_KEY)
+
+# load dataset
+dataset_path = "/movie_recommendation.json"
 with open(dataset_path, "r") as file:
     data = json.load(file)
 
-# Split the dataset
-examples = data["examples"][:3]  # Choose 3 examples for the prompt
-train_set, test_set = train_test_split(data["examples"], train_size=0.20)
+# split dataset
+dataset, test_set = train_test_split(
+    data["examples"],
+    train_size=0.2
+)
 
-# Train and get prompts with scores
-prompts_and_scores = farsight.train(train_set, examples, test_set)
+# get optimized prompts
+prompts_and_scores = farsight.generate_optimized_prompts(dataset, test_set)
 
-# Output example
+# output example
 #  [{
 #    "prompt": "Select a movie matching the genres, popularity, critical acclaim, and quality of provided examples for accurate recommendations.",
-#    "train_score": 0.94,
+#    "score": 0.94,
 #    "test_score": 0.88
 #   }, ...]
 ```
