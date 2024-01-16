@@ -44,6 +44,5 @@ def test_generate_optimized_prompts_edge_case_empty_dataset():
             [], num_iterations=3, prompts_generated_per_iteration=2
         )
 
-# Run the tests
 if __name__ == "__main__":
     pytest.main([__file__])

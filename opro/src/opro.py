@@ -112,7 +112,7 @@ class FarsightOPRO:
         global completion_tokens
         global prompt_tokens
         samples = []
-        for i in tqdm(range(len(dataset)), desc=" evaluation progress", leave=False):
+        for i in range(len(dataset)):
             test_input = dataset[i]["input"]
             target = dataset[i]["target"]
             input = f"""
@@ -168,13 +168,13 @@ class FarsightOPRO:
         num_iterations=40,
         prompts_generated_per_iteration=8,
         sample_evaluations=False,
-        eval_function=None,
+        custom_score_function=None,
     ):
         if len(dataset) < 3:
             raise ValueError(
-                "The dataset must have at least 3 elements. We recommend 50 elements."
+                "Training dataset must have at least 3 items. We recommend around 50 items."
             )
-        scorer = eval_function if eval_function else self.llm_evaluator
+        scorer = custom_score_function if custom_score_function else self.llm_evaluator
 
         # initialize price tracking variables
         completion_tokens = 0
@@ -202,7 +202,7 @@ class FarsightOPRO:
             ]
 
         # start prompt optimization iterations
-        for i in range(num_iterations):
+        for i in tqdm(range(num_iterations), desc=" evaluation progress", leave=True):
             examples = random.sample(dataset, 3)
             prompt, previous_prompts_and_scores = self.generate_prompt(
                 previous_prompts_and_scores, examples
@@ -264,4 +264,3 @@ class FarsightOPRO:
             )
             previous_prompts_and_scores = sorted_list[:20]
         return previous_prompts_and_scores
-
