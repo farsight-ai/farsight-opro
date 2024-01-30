@@ -22,6 +22,9 @@ Install the Farsight OPRO SDK with ease:
 pip install farsight-opro
 ```
 
+## Cost
+When you utilize this package, please be aware that it will incur costs to your OpenAI account.
+
 ## Usage
 
 Dive into the world of optimized prompt engineering with Farsight's OPRO SDK, an implementation inspired by the innovative [OPRO paper](https://arxiv.org/abs/2309.03409). Whether you're working on a small project or a large-scale application, our SDK adapts to your needs.
