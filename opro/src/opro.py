@@ -1,5 +1,3 @@
-import json
-import pandas as pd
 import random
 from openai import OpenAI, AzureOpenAI
 from tqdm import tqdm
